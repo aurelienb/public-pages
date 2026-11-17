@@ -1,0 +1,479 @@
+<title>Simulateur Box Spread AEX</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout : panneau de réglages à gauche, résultats à droite ; une colonne sur téléphone. Esthétique "pupitre d'options" : encre bleue, chiffres en mono. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#18212f; --muted:#5b6678; --line:#d9dee7;
+  --accent:#2a4fb0; --accent-soft:#e3e9f8; --gain:#1c7a4a; --gain-soft:#dcf1e5; --loss:#b3342b; --loss-soft:#f8e1de; --warn:#a0640c;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --surface:#171e29; --ink:#e6eaf1; --muted:#97a2b4; --line:#2a3342;
+  --accent:#7d9bf0; --accent-soft:#1f2b48; --gain:#4fc488; --gain-soft:#173327; --loss:#ef7a70; --loss-soft:#3b1d1b; --warn:#e3a94b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --surface:#171e29; --ink:#e6eaf1; --muted:#97a2b4; --line:#2a3342;
+  --accent:#7d9bf0; --accent-soft:#1f2b48; --gain:#4fc488; --gain-soft:#173327; --loss:#ef7a70; --loss-soft:#3b1d1b; --warn:#e3a94b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.1;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:68ch}
+.grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:18px}
+.panel h2,.card h2{font-family:var(--f-display);font-size:17px;font-weight:600;margin:0}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+legend{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.lbl{display:flex;justify-content:space-between;gap:8px}
+.lbl output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=number],input[type=date]{font:inherit;font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.check{flex-direction:row;align-items:center;gap:8px;color:var(--ink)}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.presets button{font:inherit;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.presets button:hover{border-color:var(--accent);color:var(--accent)}
+.presets button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.results{display:flex;flex-direction:column;gap:20px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media (max-width:620px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);padding:14px 14px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi .v{font-family:var(--f-mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .sub{margin:0;color:var(--muted);font-size:13.5px;max-width:72ch}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:0;border-top:2.5px solid;vertical-align:middle;margin-right:6px}
+svg.chart{width:100%;height:auto;display:block}
+svg text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.exitbox{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:620px){.exitbox{grid-template-columns:minmax(0,1fr)}}
+.exitbox div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;background:var(--bg)}
+.exitbox .k{font-size:12px;color:var(--muted)}
+.exitbox .v{font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums}
+.pos{color:var(--gain)} .neg{color:var(--loss)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;min-width:440px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px}
+th{font-weight:500;color:var(--muted);font-size:12px}
+td:first-child,th:first-child{text-align:left;font-family:var(--f-mono)}
+td{font-family:var(--f-mono)}
+td.g{background:var(--gain-soft);color:var(--gain)} td.l{background:var(--loss-soft);color:var(--loss)} td.z{color:var(--muted)}
+tr.cur td:first-child{color:var(--accent);font-weight:500}
+.note{font-size:12.5px;color:var(--muted);margin:0;max-width:80ch}
+.intro{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.disclaimer{margin:0 0 20px;padding:16px 20px;border:2px solid var(--loss);border-radius:10px;background:var(--loss-soft);color:var(--loss);font-family:var(--f-display);font-weight:700;font-size:clamp(20px,3.2vw,28px);line-height:1.2;text-wrap:balance}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.steps{grid-template-columns:minmax(0,1fr)}}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.step .when{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.step .big{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+.step p{margin:0;font-size:13.5px;color:var(--muted)}
+.intro .sum{margin:0;max-width:80ch}
+.ex{background:var(--bg);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.ex .tag{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--warn)}
+.ex p{margin:0;max-width:78ch}
+.ex ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;max-width:78ch}
+.ex b{font-weight:600}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+dl.gloss{margin:0;display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:8px 16px;font-size:14px}
+@media (max-width:620px){dl.gloss{grid-template-columns:minmax(0,1fr)} dl.gloss dd{margin-bottom:6px}}
+dl.gloss dt{font-weight:600}
+dl.gloss dd{margin:0;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <p class="disclaimer" role="alert">Info à utiliser à vos risques et périls : elles ne sont pas validées par un fiscaliste ou un professionnel de la finance.</p>
+  <header>
+    <span class="eyebrow">AEX · Euronext Amsterdam · options européennes · règlement en cash</span>
+    <h1>Short box spread : taux, inflation et sortie anticipée</h1>
+    <p>Vous encaissez la prime aujourd'hui et rendez la largeur du box à l'échéance. Faites varier les taux et l'inflation pour voir ce que vaut la dette en cours de route, ce que coûterait un rachat et ce que pèse le remboursement en euros d'aujourd'hui.</p>
+  </header>
+
+  <section class="intro" aria-label="Le box en clair">
+    <div class="steps">
+      <div class="step"><span class="when" id="s1w">Aujourd'hui</span><span class="big pos" id="s1v"></span><p>arrivent sur votre compte. C'est l'argent emprunté, vous pouvez l'utiliser.</p></div>
+      <div class="step"><span class="when" id="s2w">Pendant 4 ans</span><span class="big">Rien à payer</span><p>Pas de mensualité. La dette existe, mais seul son prix de rachat bouge avec les taux. Ce que vous devez rendre ne change pas.</p></div>
+      <div class="step"><span class="when" id="s3w">À l'échéance</span><span class="big neg" id="s3v"></span><p>débités automatiquement, quel que soit le niveau de l'AEX, des taux ou de l'inflation.</p></div>
+    </div>
+    <p class="sum" id="sum"></p>
+  </section>
+
+  <div class="grid">
+    <form class="panel" id="f" autocomplete="off">
+      <h2>Réglages</h2>
+      <fieldset>
+        <legend>Le box</legend>
+        <div class="row2">
+          <label for="notional">À rembourser (€)<input type="number" id="notional" value="10000" step="100" min="100"></label>
+          <label for="premium">Prime encaissée (€)<input type="number" id="premium" value="9100" step="10" min="1"></label>
+        </div>
+        <div class="row2">
+          <label for="start">Ouverture<input type="date" id="start" value="2026-11-16"></label>
+          <label for="maturity">Échéance<input type="date" id="maturity" value="2030-12-20"></label>
+        </div>
+        <div class="row2">
+          <label for="feesOpen">Frais ouverture (€)<input type="number" id="feesOpen" value="3" step="1" min="0"></label>
+          <label for="feesClose">Frais rachat (€)<input type="number" id="feesClose" value="3" step="1" min="0"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Scénario</legend>
+        <div class="presets" id="presets">
+          <button type="button" data-d="0" data-h="1" data-i="2">Taux stables</button>
+          <button type="button" data-d="2" data-h="1.5" data-i="4">Inflation qui repart</button>
+          <button type="button" data-d="-1.5" data-h="1" data-i="0.5">Récession</button>
+        </div>
+        <label for="dRate"><span class="lbl">Variation des taux du marché <output id="dRateO"></output></span>
+          <input type="range" id="dRate" min="-3" max="3" step="0.25" value="0"></label>
+        <label for="horizon"><span class="lbl">Atteinte en <output id="horizonO"></output></span>
+          <input type="range" id="horizon" min="0.25" max="4" step="0.25" value="1"></label>
+        <label for="infl"><span class="lbl">Inflation moyenne annuelle <output id="inflO"></output></span>
+          <input type="range" id="infl" min="0" max="6" step="0.1" value="2"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sortie</legend>
+        <label for="exit"><span class="lbl">Date de rachat <output id="exitO"></output></span>
+          <input type="range" id="exit" min="0" max="49" step="1" value="24"></label>
+        <label for="spread"><span class="lbl">Coût de fourchette au rachat <output id="spreadO"></output></span>
+          <input type="range" id="spread" min="0" max="600" step="10" value="150"></label>
+        <label class="check" for="hasPV"><input type="checkbox" id="hasPV" checked> J'ai des plus-values à compenser</label>
+      </fieldset>
+    </form>
+
+    <div class="results">
+      <div class="kpis">
+        <div class="kpi"><span class="k">Taux implicite</span><span class="v" id="kRate"></span><span class="s" id="kRate360"></span></div>
+        <div class="kpi"><span class="k">Taux réel</span><span class="v" id="kReal"></span><span class="s" id="kRealS"></span></div>
+        <div class="kpi"><span class="k">Coût à l'échéance</span><span class="v" id="kCost"></span><span class="s" id="kCostS"></span></div>
+        <div class="kpi"><span class="k">Rendu, en € d'aujourd'hui</span><span class="v" id="kRealVal"></span><span class="s" id="kRealValS"></span></div>
+      </div>
+
+      <section class="card">
+        <h2>Valeur de la dette dans le temps</h2>
+        <p class="sub">La ligne pointillée suit votre taux d'entrée. La ligne pleine est le prix de rachat au taux du marché du scénario. Quand elle passe sous la pointillée, racheter coûte moins cher que prévu : la hausse des taux vous profite.</p>
+        <div class="legend">
+          <span><i style="border-color:var(--muted);border-top-style:dashed"></i>Au taux d'entrée</span>
+          <span><i style="border-color:var(--accent)"></i>Prix de rachat (marché)</span>
+          <span><i style="border-color:var(--warn)"></i>Date de rachat choisie</span>
+        </div>
+        <svg class="chart" id="c1" viewBox="0 0 640 270" role="img" aria-label="Valeur de la dette dans le temps"></svg>
+        <div class="exitbox">
+          <div><span class="k" id="eDateK">Rachat</span><span class="v" id="eCash"></span><span class="k" id="eRate"></span></div>
+          <div><span class="k">Écart vs taux d'entrée</span><span class="v" id="eMtm"></span><span class="k">gain si positif</span></div>
+          <div><span class="k">Résultat fiscal</span><span class="v" id="eRes"></span><span class="k" id="eTax"></span></div>
+        </div>
+        <div class="ex"><span class="tag">Exemple concret</span><div id="ex1"></div></div>
+      </section>
+
+      <section class="card">
+        <h2>Ce que l'inflation fait au remboursement</h2>
+        <p class="sub">Valeur, en euros d'aujourd'hui, de la somme rendue à l'échéance selon l'inflation moyenne. Sous la ligne de la prime, l'emprunt a un coût réel négatif : vous rendez moins de pouvoir d'achat que vous n'en avez reçu.</p>
+        <div class="legend">
+          <span><i style="border-color:var(--accent)"></i>Remboursement en € d'aujourd'hui</span>
+          <span><i style="border-color:var(--muted);border-top-style:dashed"></i>Prime encaissée</span>
+        </div>
+        <svg class="chart" id="c2" viewBox="0 0 640 250" role="img" aria-label="Effet de l'inflation sur le remboursement"></svg>
+        <div class="ex"><span class="tag">Exemple concret</span><div id="ex2"></div></div>
+      </section>
+
+      <section class="card">
+        <h2>Résultat d'un rachat anticipé</h2>
+        <p class="sub">Résultat fiscal avant impôt (prime encaissée moins prix de rachat, fourchette et frais), selon la variation des taux et la date de sortie. Les taux bougent ici d'un coup, dès l'ouverture.</p>
+        <div class="tablewrap"><table id="tbl"></table></div>
+        <div class="ex"><span class="tag">Comment lire une case</span><div id="ex3"></div></div>
+      </section>
+
+      <section class="card">
+        <h2>Les mots utilisés</h2>
+        <dl class="gloss">
+          <dt>Vendre un box</dt><dd>Passer les 4 ordres sur options en un seul combo. Vous encaissez une prime maintenant et vous devez une somme fixe à l'échéance : c'est un emprunt.</dd>
+          <dt>Taux implicite</dt><dd>Le taux d'intérêt caché dans l'écart entre ce que vous recevez et ce que vous rendez. Il est fixé le jour de l'ouverture.</dd>
+          <dt>Taux du marché</dt><dd>Le taux auquel les autres empruntent aujourd'hui pour la même durée. Il bouge avec la BCE et l'inflation, votre taux d'entrée ne bouge pas.</dd>
+          <dt>Prix de rachat</dt><dd>Ce que vous paieriez pour fermer le box avant l'échéance : la somme due, actualisée au taux du marché du moment.</dd>
+          <dt>Fourchette</dt><dd>L'écart entre prix acheteur et vendeur. Sur des options AEX à 4 ans, elle peut coûter quelques centaines d'euros au rachat.</dd>
+          <dt>Résultat fiscal</dt><dd>Prime reçue moins tout ce que vous avez payé pour fermer. Négatif : moins-value déclarée. Positif : gain imposé au PFU.</dd>
+          <dt>Taux réel</dt><dd>Votre taux moins l'inflation. Négatif, il veut dire que la hausse des prix rembourse une partie de vos intérêts.</dd>
+        </dl>
+      </section>
+
+      <p class="note">Modèle simplifié : taux actuariels sur une base de 365 jours, prix du box égal au montant dû actualisé au taux du marché, fiscalité au PFU de 31,4 % (12,8 % d'impôt et 18,6 % de prélèvements sociaux). Ni la marge chez le courtier ni la liquidité réelle des options AEX longues ne sont modélisées. Ce n'est pas un conseil en investissement.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const PFU = 0.314;
+  const nf0 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+  const eur = x => nf0.format(Math.round(x)) + ' €';
+  const seur = x => (x>0?'+':x<0?'−':'') + nf0.format(Math.abs(Math.round(x))) + ' €';
+  const pct = (x,d=2) => (x*100).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d}) + ' %';
+  const spct = (x,d=2) => (x>0?'+':x<0?'−':'') + pct(Math.abs(x),d);
+  const MONTHS = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  const fmtDate = d => d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+  const NS = 'http://www.w3.org/2000/svg';
+
+  function read(){
+    const s = new Date($('start').value + 'T00:00:00');
+    let m = new Date($('maturity').value + 'T00:00:00');
+    if (!(m > s)) m = new Date(s.getTime() + 365*864e5);
+    const days = Math.round((m - s)/864e5);
+    return {
+      N: Math.max(1, +$('notional').value || 0),
+      P: Math.max(1, +$('premium').value || 0),
+      start: s, mat: m, days, T: days/365,
+      fo: +$('feesOpen').value || 0, fc: +$('feesClose').value || 0,
+      d: +$('dRate').value/100, h: +$('horizon').value,
+      pi: +$('infl').value/100, spread: +$('spread').value,
+      exitM: +$('exit').value, pv: $('hasPV').checked
+    };
+  }
+
+  function model(p){
+    const r0 = Math.pow(p.N/p.P, 1/p.T) - 1;
+    const rAt = (t, d=p.d, h=p.h) => Math.max(-0.009, r0 + d*Math.min(1, t/h));
+    const V = (t, d, h) => t >= p.T ? p.N : p.N/Math.pow(1+rAt(t,d,h), p.T-t);
+    const B = t => t >= p.T ? p.N : p.N/Math.pow(1+r0, p.T-t);
+    function exitAt(t, d, h){
+      const atMat = t >= p.T - 1e-9;
+      const v = V(t, d, h);
+      const extra = atMat ? 0 : p.spread + p.fc;
+      const res = p.P - v - extra - p.fo; // résultat fiscal
+      return {t, v, atMat, cash: v + (atMat?0:p.spread), res, mtm: B(t) - v, r: rAt(t,d,h)};
+    }
+    return {r0, rAt, V, B, exitAt};
+  }
+
+  function niceTicks(lo, hi, n=5){
+    const span = hi - lo || 1, raw = span/n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1,2,2.5,5,10].map(k=>k*mag).find(s => s >= raw);
+    const a = Math.floor(lo/step)*step, b = Math.ceil(hi/step)*step, out = [];
+    for (let v=a; v<=b+step*1e-6; v+=step) out.push(+v.toFixed(10));
+    return out;
+  }
+
+  function el(tag, attrs, parent, text){
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    parent.appendChild(e); return e;
+  }
+
+  function frame(svg, W, H, pad, xmin, xmax, yt, xt, yfmt){
+    svg.innerHTML = '';
+    const ymin = yt[0], ymax = yt[yt.length-1];
+    const X = x => pad.l + (x - xmin)/(xmax - xmin)*(W - pad.l - pad.r);
+    const Y = y => H - pad.b - (y - ymin)/(ymax - ymin)*(H - pad.t - pad.b);
+    yt.forEach(v => {
+      el('line',{x1:pad.l,x2:W-pad.r,y1:Y(v),y2:Y(v),stroke:'var(--line)','stroke-width':1},svg);
+      el('text',{x:pad.l-8,y:Y(v)+4,'text-anchor':'end'},svg,yfmt(v));
+    });
+    xt.forEach(o => el('text',{x:X(o.v),y:H-pad.b+18,'text-anchor':'middle'},svg,o.label));
+    return {X, Y};
+  }
+
+  function path(pts, X, Y){ return pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join(' '); }
+
+  function drawDebt(p, m, ex){
+    const svg = $('c1'), W=640, H=270, pad={l:64,r:18,t:14,b:30};
+    const n = 160, mkt=[], book=[];
+    for (let i=0;i<=n;i++){ const t=p.T*i/n; mkt.push([t,m.V(t)]); book.push([t,m.B(t)]); }
+    const all = mkt.concat(book).map(q=>q[1]);
+    const yt = niceTicks(Math.min(...all), Math.max(...all), 5);
+    const xt = [];
+    const y0 = p.start.getFullYear();
+    for (let y=y0+1; y<=p.mat.getFullYear(); y++){
+      const t = (new Date(y,0,1) - p.start)/864e5/365;
+      if (t > 0.05 && t < p.T - 0.05) xt.push({v:t,label:String(y)});
+    }
+    const {X,Y} = frame(svg,W,H,pad,0,p.T,yt,xt,v=>nf0.format(v));
+    // zone entre les deux courbes
+    const area = mkt.map(q=>q).concat(book.slice().reverse());
+    el('path',{d:path(area,X,Y)+'Z',fill: ex.mtm>=0 ? 'var(--gain)' : 'var(--loss)','fill-opacity':0.12,stroke:'none'},svg);
+    el('path',{d:path(book,X,Y),fill:'none',stroke:'var(--muted)','stroke-width':1.6,'stroke-dasharray':'5 4'},svg);
+    el('path',{d:path(mkt,X,Y),fill:'none',stroke:'var(--accent)','stroke-width':2.4,'stroke-linejoin':'round'},svg);
+    // échéance
+    el('circle',{cx:X(p.T),cy:Y(p.N),r:3.5,fill:'var(--ink)'},svg);
+    el('text',{x:X(p.T)-6,y:Y(p.N)-8,'text-anchor':'end'},svg,'échéance '+eur(p.N));
+    // rachat
+    const xe = X(ex.t);
+    el('line',{x1:xe,x2:xe,y1:pad.t,y2:H-pad.b,stroke:'var(--warn)','stroke-width':1.4,'stroke-dasharray':'2 3'},svg);
+    el('circle',{cx:xe,cy:Y(ex.v),r:5,fill:'var(--warn)',stroke:'var(--surface)','stroke-width':2},svg);
+  }
+
+  function drawInfl(p, m){
+    const svg = $('c2'), W=640, H=250, pad={l:64,r:18,t:14,b:30};
+    const pts=[]; for (let i=0;i<=60;i++){ const pi=i/1000; pts.push([pi, p.N/Math.pow(1+pi,p.T)]); }
+    const ys = pts.map(q=>q[1]).concat([p.P]);
+    const yt = niceTicks(Math.min(...ys), Math.max(...ys), 5);
+    const xt = [0,0.01,0.02,0.03,0.04,0.05,0.06].map(v=>({v,label:(v*100)+' %'}));
+    const {X,Y} = frame(svg,W,H,pad,0,0.06,yt,xt,v=>nf0.format(v));
+    // zone coût réel négatif
+    const cross = Math.min(0.06, Math.max(0, m.r0));
+    if (m.r0 < 0.06){
+      const under = pts.filter(q=>q[0]>=cross); under.unshift([cross,p.P]);
+      el('path',{d:path(under,X,Y)+' L'+X(0.06)+' '+Y(p.P)+' Z',fill:'var(--gain)','fill-opacity':0.13,stroke:'none'},svg);
+    }
+    el('line',{x1:X(0),x2:X(0.06),y1:Y(p.P),y2:Y(p.P),stroke:'var(--muted)','stroke-width':1.6,'stroke-dasharray':'5 4'},svg);
+    el('path',{d:path(pts,X,Y),fill:'none',stroke:'var(--accent)','stroke-width':2.4},svg);
+    if (m.r0 > 0 && m.r0 < 0.06){
+      el('line',{x1:X(m.r0),x2:X(m.r0),y1:Y(p.P),y2:H-pad.b,stroke:'var(--muted)','stroke-width':1,'stroke-dasharray':'2 3'},svg);
+      el('text',{x:X(m.r0)+6,y:H-pad.b-6},svg,'coût réel nul à '+pct(m.r0,1));
+    }
+    const cx = Math.min(p.pi,0.06), cy = p.N/Math.pow(1+cx,p.T);
+    el('circle',{cx:X(cx),cy:Y(cy),r:5.5,fill:'var(--warn)',stroke:'var(--surface)','stroke-width':2},svg);
+    el('text',{x:X(cx)+(cx>0.045?-9:9),y:Y(cy)-10,'text-anchor':cx>0.045?'end':'start',style:'fill:var(--ink)'},svg,eur(cy));
+  }
+
+  function drawTable(p, m){
+    const ds = [-2,-1,0,1,2];
+    const cols = [];
+    [1,2,3].forEach(y=>{ if (y < p.T - 0.1) cols.push({t:y,label:'après '+y+' an'+(y>1?'s':'')}); });
+    cols.push({t:p.T,label:'à l\'échéance'});
+    let h = '<thead><tr><th>Taux</th>'+cols.map(c=>'<th>'+c.label+'</th>').join('')+'</tr></thead><tbody>';
+    ds.forEach(d=>{
+      const cur = Math.abs(d/100 - p.d) < 1e-9 ? ' class="cur"' : '';
+      h += '<tr'+cur+'><td>'+(d>0?'+':d<0?'−':'±')+Math.abs(d)+' pt'+(Math.abs(d)>1?'s':'')+'</td>';
+      cols.forEach(c=>{
+        const ex = m.exitAt(c.t, d/100, 1e-6);
+        const cls = ex.atMat ? 'z' : (ex.mtm - p.spread > 0 ? 'g' : 'l');
+        h += '<td class="'+cls+'">'+seur(ex.res)+'</td>';
+      });
+      h += '</tr>';
+    });
+    $('tbl').innerHTML = h + '</tbody>';
+  }
+
+  function render(){
+    const p = read();
+    const totalM = Math.max(1, Math.round(p.T*12));
+    const ex = $('exit'); ex.max = totalM; if (+ex.value > totalM) ex.value = totalM;
+    p.exitM = +ex.value;
+    const m = model(p);
+    const te = Math.min(p.T, p.exitM/12 * (p.T*12/totalM));
+    const exr = m.exitAt(te);
+    const exDate = new Date(p.start.getTime() + te*365*864e5);
+
+    $('dRateO').textContent = (p.d===0?'±0':spct(p.d,2).replace(' %',' pt'));
+    $('dRateO').textContent = p.d===0 ? '±0 pt' : (p.d>0?'+':'−')+(Math.abs(p.d)*100).toLocaleString('fr-FR')+' pt';
+    $('horizonO').textContent = p.h.toLocaleString('fr-FR')+' an'+(p.h>1?'s':'');
+    $('inflO').textContent = pct(p.pi,1);
+    $('exitO').textContent = exr.atMat ? 'à l\'échéance' : fmtDate(exDate);
+    $('spreadO').textContent = eur(p.spread);
+
+    const simple = (p.N/p.P - 1)*360/p.days;
+    const real = (1+m.r0)/(1+p.pi) - 1;
+    const realVal = p.N/Math.pow(1+p.pi, p.T);
+    const cost = p.N - p.P + p.fo;
+    $('kRate').textContent = pct(m.r0);
+    $('kRate360').textContent = pct(simple)+' en simple ACT/360';
+    $('kReal').textContent = spct(real);
+    $('kReal').className = 'v ' + (real<0?'pos':'');
+    $('kRealS').textContent = 'avec '+pct(p.pi,1)+' d\'inflation';
+    $('kCost').textContent = eur(cost);
+    $('kCostS').textContent = p.pv ? 'net d\'impôt : '+eur(cost*(1-PFU)) : 'sans plus-values à compenser';
+    $('kRealVal').textContent = eur(realVal);
+    $('kRealValS').textContent = (realVal < p.P ? 'moins que les ' : 'pour ') + eur(p.P) + ' reçus';
+    $('kRealVal').className = 'v ' + (realVal < p.P ? 'pos' : '');
+
+    $('eDateK').textContent = exr.atMat ? 'Remboursement à l\'échéance' : 'Prix de rachat le '+fmtDate(exDate);
+    $('eCash').textContent = eur(exr.cash);
+    $('eRate').textContent = exr.atMat ? 'montant fixe, quels que soient les taux' : 'fourchette incluse, taux marché '+pct(exr.r);
+    const mtm = exr.atMat ? 0 : exr.mtm - p.spread;
+    $('eMtm').textContent = seur(mtm);
+    $('eMtm').className = 'v ' + (mtm>0?'pos':mtm<0?'neg':'');
+    $('eRes').textContent = seur(exr.res);
+    $('eRes').className = 'v ' + (exr.res>0?'pos':'neg');
+    let tax;
+    if (exr.res >= 0) tax = 'impôt PFU : '+eur(exr.res*PFU);
+    else tax = p.pv ? 'économie d\'impôt : '+eur(-exr.res*PFU) : 'moins-value reportable 10 ans';
+    $('eTax').textContent = tax;
+
+    drawDebt(p, m, exr);
+    drawInfl(p, m);
+    drawTable(p, m);
+    explain(p, m);
+  }
+
+  const N_ = x => '<span class="num">'+x+'</span>';
+  const yrs = t => { const v = Math.round(t*10)/10; return v.toLocaleString('fr-FR')+' an'+(v>=2?'s':''); };
+
+  function explain(p, m){
+    const interest = p.N - p.P;
+    $('s1w').textContent = 'Aujourd\'hui, '+fmtDate(p.start);
+    $('s1v').textContent = '+ '+eur(p.P);
+    $('s2w').textContent = 'Pendant '+yrs(p.T);
+    $('s3w').textContent = 'Le '+fmtDate(p.mat);
+    $('s3v').textContent = '− '+eur(p.N);
+    $('sum').innerHTML = 'La différence, '+N_(eur(interest))+', ce sont vos intérêts pour '+yrs(p.T)+', soit '+N_(pct(m.r0))+' par an. C\'est un crédit in fine à taux fixe : tout est remboursé d\'un coup à la fin. Le simulateur répond à deux questions : combien coûterait une sortie avant la fin si les taux changent, et combien vaudront vraiment ces '+N_(eur(p.N))+' une fois l\'inflation passée.';
+
+    // Exemple 1 : rachat après ~2 ans, taux stables / +1 / -1
+    const t2 = Math.min(2, Math.max(0.25, p.T - 0.5));
+    const d2 = new Date(p.start.getTime() + t2*365*864e5);
+    const e0 = m.exitAt(t2, 0, 1e-6), eu = m.exitAt(t2, 0.01, 1e-6), ed = m.exitAt(t2, -0.01, 1e-6);
+    const pay0 = e0.v + p.spread - p.P;
+    $('ex1').innerHTML =
+      '<p>On se place le '+N_(fmtDate(d2))+', '+yrs(t2)+' après l\'ouverture. Vous voulez fermer le box, par exemple pour vendre des actions et réduire votre levier. Il reste '+yrs(p.T - t2)+' avant l\'échéance, donc vous ne rendez pas '+N_(eur(p.N))+' mais leur valeur actualisée.</p>'+
+      '<ul>'+
+      '<li><b>Taux inchangés</b> : le rachat coûte '+N_(eur(e0.v))+', plus '+N_(eur(p.spread))+' de fourchette. Vous aviez reçu '+N_(eur(p.P))+', vous avez donc payé '+N_(eur(pay0))+' pour '+yrs(t2)+' d\'emprunt. Ce sont simplement les intérêts de la période, plus le coût de sortie.</li>'+
+      '<li><b>Taux en hausse d\'1 point</b> : le rachat tombe à '+N_(eur(eu.v))+', soit '+N_(eur(e0.v - eu.v))+' de moins. Le marché prête désormais plus cher que vous, votre dette bon marché vaut donc moins.</li>'+
+      '<li><b>Taux en baisse d\'1 point</b> : le rachat monte à '+N_(eur(ed.v))+', soit '+N_(eur(ed.v - e0.v))+' de plus. Vous payez plus cher que le marché, et en sortir coûte plus.</li>'+
+      '</ul>'+
+      '<p>C\'est le mécanisme d\'une obligation, vu du côté de celui qui l\'a émise : quand les taux montent, le prix baisse. Si vous gardez le box jusqu\'au bout, aucun de ces chiffres ne compte : vous rendez '+N_(eur(p.N))+' dans tous les cas.</p>';
+
+    // Exemple 2 : inflation
+    const rv = pi => p.N/Math.pow(1+pi, p.T);
+    const line = (pi, label) => {
+      const v = rv(pi), c = v - p.P, rise = Math.pow(1+pi,p.T)-1;
+      const verdict = c >= 0 ? 'votre vrai coût est de '+N_(eur(c))+' en pouvoir d\'achat, au lieu des '+N_(eur(interest))+' affichés'
+                             : 'vous rendez '+N_(eur(-c))+' de pouvoir d\'achat de moins que ce que vous avez reçu : l\'inflation a payé vos intérêts';
+      return '<li><b>'+label+' ('+pct(pi,1)+' par an)</b> : les prix montent de '+N_(pct(rise,0))+' d\'ici l\'échéance. Les '+N_(eur(p.N))+' achèteront alors ce qu\'achètent '+N_(eur(v))+' aujourd\'hui, donc '+verdict+'.</li>';
+    };
+    $('ex2').innerHTML =
+      '<p>Le montant à rendre est fixé en euros. Si les prix et les salaires augmentent, ces euros valent moins au moment de rembourser.</p>'+
+      '<ul>'+line(0.005,'Inflation faible')+line(0.02,'Cible de la BCE')+line(0.04,'Inflation forte')+'</ul>'+
+      '<p>Règle simple : si l\'inflation moyenne dépasse votre taux de '+N_(pct(m.r0,1))+', l\'emprunt ne vous coûte rien en réel. Votre réglage actuel, '+N_(pct(p.pi,1))+', correspond au point orange sur la courbe.</p>';
+
+    // Exemple 3 : lecture du tableau
+    const tt = Math.min(2, p.T - 0.1);
+    const c = m.exitAt(tt, 0.01, 1e-6), c0 = m.exitAt(tt, 0, 1e-6);
+    const paid = c.v + p.spread + p.fc + p.fo;
+    const fisc = c.res < 0
+      ? 'Négatif : c\'est une moins-value. '+(p.pv ? 'Imputée sur vos plus-values, elle vous fait économiser '+N_(eur(-c.res*PFU))+' d\'impôt.' : 'Sans plus-values à compenser, elle se reporte sur les 10 années suivantes.')
+      : 'Positif : c\'est un gain, imposé '+N_(eur(c.res*PFU))+' au PFU.';
+    $('ex3').innerHTML =
+      '<p>Prenez la ligne <b>+1 pt</b> et la colonne <b>après '+(tt>=2?'2 ans':yrs(tt))+'</b> : '+N_(seur(c.res))+'. Le calcul : vous avez reçu '+N_(eur(p.P))+' et vous payez '+N_(eur(paid))+' pour sortir (rachat '+N_(eur(c.v))+', fourchette '+N_(eur(p.spread))+', frais '+N_(eur(p.fc + p.fo))+'). '+fisc+'</p>'+
+      '<p>Avec des taux inchangés, la même sortie donnerait '+N_(seur(c0.res))+'. Une case <b>verte</b> veut dire que la variation des taux vous fait sortir moins cher que ne le prévoyait votre taux d\'entrée, fourchette comprise. Une case <b>rouge</b>, plus cher. La dernière colonne est grise : à l\'échéance, le résultat est le même quels que soient les taux.</p>';
+  }
+
+  document.querySelectorAll('#presets button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      $('dRate').value = b.dataset.d; $('horizon').value = b.dataset.h; $('infl').value = b.dataset.i;
+      document.querySelectorAll('#presets button').forEach(x=>x.classList.toggle('on', x===b));
+      render();
+    });
+  });
+  ['dRate','horizon','infl'].forEach(id=>$(id).addEventListener('input',()=>{
+    document.querySelectorAll('#presets button').forEach(x=>x.classList.remove('on'));
+  }));
+  $('f').addEventListener('input', render);
+  $('f').addEventListener('change', render);
+  $('f').addEventListener('submit', e=>e.preventDefault());
+  document.querySelector('#presets button').classList.add('on');
+  render();
+})();
+</script>
